@@ -1,0 +1,4 @@
+head    ansible_ssh_host=ctl.install.xos-pg0.clemson.cloudlab.us
+
+[compute]
+cp-1.install.xos-pg0.clemson.cloudlab.us

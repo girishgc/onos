@@ -1,0 +1,78 @@
+---
+# head-diag/tasks/main.yml
+
+- name: Create diag_dir subdirs
+  file:
+    dest="~/{{ diag_dir }}/{{ item }}"
+    state=directory
+  with_items:
+  - net
+  - juju
+  - openstack
+  - onos
+  - xos
+
+- name: Networking diag collection
+  shell: "{{ item }} > ~/{{ diag_dir }}/net/{{ item | regex_replace('[^\\w-]', '_')}}"
+  with_items:
+   - "ifconfig -a"
+   - "route -n"
+   - "arp -n"
+   - "brctl show"
+   - "cat /etc/resolv.conf"
+   - "sudo uvt-kvm list"
+
+- name: Juju diag collection
+  shell: "{{ item }} > ~/{{ diag_dir }}/juju/{{ item | regex_replace('[^\\w-]', '_')}}"
+  with_items:
+   - "juju status --format=summary"
+   - "juju status --format=json"
+
+- name: OpenStack diag collection
+  shell: "source ~/admin-openrc.sh && {{ item }} > ~/{{ diag_dir }}/openstack/{{ item | regex_replace('[^\\w-]', '_')}}"
+  args:
+    executable: "/bin/bash"
+  with_items:
+   - "glance image-list"
+   - "nova list --all-tenants"
+   - "nova host-list"
+   - "keystone tenant-list"
+   - "keystone user-list"
+   - "neutron net-list"
+   - "neutron subnet-list"
+   - "neutron port-list"
+
+- name: ONOS diag collection - REST API
+  shell: "curl -X GET -u karaf:karaf http://onos-cord-1:8181/onos/v1/{{ item }} | python -m json.tool > ~/{{ diag_dir }}/onos/rest_{{ item | regex_replace('[^\\w-]', '_') }}"
+  with_items:
+   - "hosts"
+
+- name: ONOS diag collection - ONOS CLI
+  shell: "sshpass -p 'karaf' ssh -p 8101 karaf@onos-cord {{ item }} > ~/{{ diag_dir }}/onos/{{ item | regex_replace('[^\\w-]', '_') }}"
+  with_items:
+   - "apps -s -a"
+   - "bundle:list"
+   - "cordvtn-node-check nova-compute-1"
+   - "cordvtn-nodes"
+   - "dhcp-list"
+   - "flows"
+   - "hosts"
+   - "log:display"
+   - "nodes"
+   - "ports"
+   - "summary"
+
+- name: XOS diag collection
+  shell: "ssh ubuntu@xos-1 \"{{ item }}\" > ~/{{ diag_dir }}/xos/{{ item | regex_replace('[^\\w-]', '_')}}"
+  with_items:
+   - "docker ps"
+   - "arp -n"
+   - "ifconfig -a"
+
+- name: Copy/run/retrieve XOS docker logs
+  command: "{{ item }}"
+  with_items:
+   - "scp {{ role_path }}/files/docker_logs.sh ubuntu@xos-1:~/docker_logs.sh"
+   - "ssh ubuntu@xos-1 'bash ~/docker_logs.sh'"
+   - "rsync -avP ubuntu@xos-1:~/docker_logs/ ~/{{ diag_dir }}/xos/"
+
